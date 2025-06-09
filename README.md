@@ -3,14 +3,18 @@
 ```
 KinetiZK-Demo/
 ├── app/
+│   ├── libs/
+│   │   └── kinetizk.aar
 │   ├── src/
 │   │   ├── main/
+│   │   │   ├── assets
+│   │   │   │   └── kinetizk_keys.json
 │   │   │   ├── java/com/example/kinetizk/demo/
 │   │   │   │   ├── MainActivity.kt
 │   │   │   │   ├── SplashActivity.kt
 │   │   │   │   ├── KinetiZKHelper.kt
 │   │   │   │   ├── SensorCollector.kt
-│   │   │   │   └── KinetiZKKeys.kt
+│   │   │   │   └── KinetiZKKeyLoader.kt
 │   │   │   ├── res/
 │   │   │   │   ├── layout/
 │   │   │   │   │   ├── activity_splash.xml
@@ -36,4 +40,3 @@ KinetiZK-Demo/
 2. **SplashActivity.kt** - 시작 화면
 3. **KinetiZKHelper.kt** - SDK 래퍼 클래스
 4. **SensorCollector.kt** - 센서 데이터 수집 관리
-5. **KinetiZKKeys.kt** - Base64 인코딩된 키 저장 (production용)
