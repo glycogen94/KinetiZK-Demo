@@ -120,7 +120,7 @@ private suspend fun runPipeline() = withContext(Dispatchers.IO) {
 }
 
     /* ───────── 결과 카드 UI ───────── */
-    private fun showResult(isHuman: Boolean, score: Long) {
+    private fun showResult(isHuman: Boolean, score: Double) {
         val cardColor: Int
         val textColor: Int
         val label: String

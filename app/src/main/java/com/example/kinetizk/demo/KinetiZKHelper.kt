@@ -5,12 +5,13 @@ import mobile.Mobile
 import mobile.SDK
 import org.json.JSONArray
 import org.json.JSONObject
+import java.math.BigInteger
 
 data class ProofResult(
     val proof: String,
     val classification: Int,
     val success: Boolean,
-    val score: Long
+    val score: Double
 )
 
 object KinetiZKHelper {
@@ -60,9 +61,9 @@ object KinetiZKHelper {
             proof          = pj.getString("proof_base64"),
             classification = cls,
             success        = verified,
-            score          = score.toLong()
+            score          = score
         )
-    }.getOrElse { ProofResult("",0,false, 0L) }
+    }.getOrElse { ProofResult("",0,false, 0.0) }
 
     /* ---------- 내부 ---------- */
     private fun sdk(): SDK =
