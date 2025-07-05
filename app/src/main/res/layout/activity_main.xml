@@ -99,7 +99,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- Bot-mode 토글 스위치 하나로 통일 -->
+        <!-- Bot-mode 토글 스위치 -->
         <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/switchBotMode"
             android:layout_width="wrap_content"

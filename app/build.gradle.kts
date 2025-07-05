@@ -52,9 +52,10 @@ dependencies {
     
     // JSON
     implementation("org.json:json:20230227")
+    implementation("com.google.code.gson:gson:2.10.1")
     
     // KinetiZK SDK
-    implementation(files("libs/kinetizk.aar"))
+    implementation(files("libs/KinetiZK-SDK-release.aar"))
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

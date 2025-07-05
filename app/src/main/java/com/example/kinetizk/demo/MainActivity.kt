@@ -16,19 +16,20 @@ import kotlinx.coroutines.*
 import kotlin.math.roundToInt
 import kotlin.random.Random
 import kotlin.system.measureTimeMillis
-import com.example.kinetizk.demo.SensorCollector
-import com.example.kinetizk.demo.KinetiZKHelper
+import com.kinetizk.sdk.KinetiZK
+import com.kinetizk.sdk.KinetiZKConfig
+import com.kinetizk.sdk.KinetiZKResult
+import com.kinetizk.sdk.KinetiZKError
 
 class MainActivity : AppCompatActivity() {
 
-    /* ───────── 뷰 및 헬퍼 ───────── */
+    /* ───────── 뷰 ───────── */
     private lateinit var binding: ActivityMainBinding
-    private val sensorCollector by lazy { SensorCollector(this) }
 
     /* ───────── 상태 플래그 ───────── */
-    private var collecting   = false
     private var botMode      = false
     private val botHandler   = Handler(Looper.getMainLooper())
+    private var challengeRunning = false
 
     /* ───────── 봇-터치 파라미터 ───────── */
     private val rand               = Random.Default
@@ -43,10 +44,14 @@ class MainActivity : AppCompatActivity() {
         window.statusBarColor = getColor(R.color.background_dark)
 
         /* 1) KinetiZK SDK 초기화 */
-        lifecycleScope.launch(Dispatchers.IO) {
-            KinetiZKHelper.initialize(applicationContext)
-            withContext(Dispatchers.Main) { initUi() }
-        }
+        val config = KinetiZKConfig(
+            siteKey = "demo_site_key",
+            enableLogging = true,
+            timeoutMillis = Long.MAX_VALUE  // 무제한 대기
+        )
+        KinetiZK.initialize(this, config)
+
+        initUi()
     }
 
     /* ───────── UI 초기 세팅 ───────── */
@@ -54,70 +59,50 @@ class MainActivity : AppCompatActivity() {
         binding.switchBotMode.setOnCheckedChangeListener { _, checked ->
             botMode = checked
             updateInstruction()
-            if (checked) startBotLoop() else stopBotLoop()
+            if (checked) {
+                startBotLoop()
+            } else {
+                stopBotLoop()
+            }
         }
         updateInstruction()
-        setupTouchDetection()
+        
+        // SDK가 직접 센싱하도록 백그라운드에서 시작
+        startContinuousSensing()
     }
-
+    
     /* ───────── 터치 감지 ───────── */
-    @SuppressLint("ClickableViewAccessibility")
-    private fun setupTouchDetection() = binding.touchArea.setOnTouchListener { _, ev ->
-        when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN -> { if (!collecting) beginCollection(ev) }
-            MotionEvent.ACTION_UP   -> { if (collecting)  endCollection()     }
-        }
-        true
-    }
-
-    private fun beginCollection(ev: MotionEvent) {
-        collecting = true
-        sensorCollector.register()                // 센서 리스너 등록
-        KinetiZKHelper.startCollection()
-
-        val downNs = ev.eventTime * 1_000_000L
-        sensorCollector.beginWindow(downNs) { r ->
-            KinetiZKHelper.addSensorReading(
-                r.timestamp,
-                r.accelX, r.accelY, r.accelZ,
-                r.gyroX,  r.gyroY,  r.gyroZ
-            )
-        }
-        binding.progressBar.isVisible = true
-        binding.cardResult.isVisible  = false
-        updateInstruction("Collecting…")
-    }
-
-    private fun endCollection() {
-        collecting = false
-        sensorCollector.endWindow()
-        sensorCollector.unregister()
-        updateInstruction("Generating proof…")
-
-        lifecycleScope.launch {
-            val elapsed = measureTimeMillis {
-                runCatching { runPipeline() }
-                    .onFailure { showError(it.message) }
+    private fun startContinuousSensing() {
+        if (challengeRunning) return
+        
+        challengeRunning = true
+        updateInstruction("SDK monitoring sensors...")
+        
+        val startTime = System.currentTimeMillis()
+        
+        KinetiZK.execute(this@MainActivity) { result ->
+            val elapsed = System.currentTimeMillis() - startTime
+            
+            when (result) {
+                is KinetiZKResult.Success -> {
+                    showResult(result.isHuman, result.score)
+                }
+                is KinetiZKResult.Failure -> {
+                    handleError(result.error)
+                }
             }
+            
             binding.tvElapsed.text = "Elapsed: ${elapsed} ms"
             binding.progressBar.isVisible = false
+            
+            // 결과 표시 후 다시 센싱 시작
+            Handler(Looper.getMainLooper()).postDelayed({
+                challengeRunning = false
+                startContinuousSensing()
+            }, 2000)
         }
     }
 
-    /* ───────── ZKP 파이프라인 ───────── */
-private suspend fun runPipeline() = withContext(Dispatchers.IO) {
-    val result = KinetiZKHelper.collectAndProve()     // ★
-
-    withContext(Dispatchers.Main) {
-        if (result.success)
-            // classification: 0=human, 1=bot
-            showResult(result.classification == 0, score = result.score)
-        else
-            showError("Proof verification failed")
-            showResult(result.classification == 0, score = result.score)
-
-    }
-}
 
     /* ───────── 결과 카드 UI ───────── */
     private fun showResult(isHuman: Boolean, score: Double) {
@@ -147,9 +132,10 @@ private suspend fun runPipeline() = withContext(Dispatchers.IO) {
         }
     }
 
-    private fun showError(msg: String?) {
+    private fun handleError(error: KinetiZKError) {
+        val msg = error.name
         updateInstruction("Error: $msg")
-        Snackbar.make(binding.rootLayout, msg ?: "Unknown error", Snackbar.LENGTH_LONG).show()
+        Snackbar.make(binding.rootLayout, msg, Snackbar.LENGTH_LONG).show()
     }
 
     /* ───────── 봇-모드 루프 ───────── */
@@ -157,7 +143,9 @@ private suspend fun runPipeline() = withContext(Dispatchers.IO) {
         botHandler.post(object : Runnable {
             override fun run() {
                 if (!botMode) return
+                
                 val (x, y) = randomPos()
+                // SDK가 직접 감지할 수 있도록 실제 터치 이벤트 주입
                 injectSyntheticTouch(x, y)
                 showDot(x, y)
                 botHandler.postDelayed(
@@ -167,6 +155,7 @@ private suspend fun runPipeline() = withContext(Dispatchers.IO) {
             }
         })
     }
+    
     private fun stopBotLoop() = botHandler.removeCallbacksAndMessages(null)
 
     private fun randomPos(): Pair<Int, Int> {
@@ -181,9 +170,19 @@ private suspend fun runPipeline() = withContext(Dispatchers.IO) {
         val t1  = t0 + BOT_HOLD_MS
         val down = MotionEvent.obtain(t0, t0, MotionEvent.ACTION_DOWN, x.toFloat(), y.toFloat(), 0)
         val up   = MotionEvent.obtain(t0, t1, MotionEvent.ACTION_UP,   x.toFloat(), y.toFloat(), 0)
+        
+        // 터치 영역에 전달 (시각적 효과용)
         binding.touchArea.dispatchTouchEvent(down)
         binding.touchArea.dispatchTouchEvent(up)
-        down.recycle(); up.recycle()
+        
+        // SDK에도 전달 (봇 감지용) - SDK가 백그라운드에서 감지할 수 있도록
+        window.decorView.dispatchTouchEvent(down)
+        Handler(Looper.getMainLooper()).postDelayed({
+            window.decorView.dispatchTouchEvent(up)
+        }, BOT_HOLD_MS)
+        
+        down.recycle()
+        up.recycle()
     }
 
     /* ───────── 터치 시각화 ───────── */
@@ -209,7 +208,19 @@ private suspend fun runPipeline() = withContext(Dispatchers.IO) {
     private fun updateInstruction(text: String = defaultInstruction()) {
         binding.tvInstruction.text = text
     }
-    private fun defaultInstruction() = if (botMode)
-        "Bot-mode active. Simulating taps…" else "Tap the screen to generate a proof."
+    private fun defaultInstruction() = when {
+        botMode -> "Bot-mode active. Simulating taps…"
+        challengeRunning -> "Challenge in progress…"
+        else -> "Tap the screen to generate a proof."
+    }
     private val Int.dp get() = (this * resources.displayMetrics.density).roundToInt()
+    
+    /* ───────── 터치 이벤트 감지 ───────── */
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        ev?.let { event ->
+            // SDK에 터치 이벤트 전달
+            KinetiZK.handleTouchEvent(event)
+        }
+        return super.dispatchTouchEvent(ev)
+    }
 }

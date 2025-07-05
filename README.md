@@ -25,68 +25,39 @@ The user's personal sensor data is never transmitted externally. Only a cryptogr
 -   **Core Logic**: KinetiZK Go SDK (AAR library bound via gomobile)
 -   **ZK-SNARK Proof System**: [gnark](https://github.com/Consensys/gnark)
 
-## Project Structure
+## Technical Details
 
-```
-app/
-├── libs/
-│   └── kinetizk.aar            # KinetiZK Go SDK Library
-├── src/
-│   ├── main/
-│   │   ├── assets/
-│   │   │   └── kinetizk_keys.json  # ZKP Proving/Verifying Keys (Base64)
-│   │   ├── java/com/example/kinetizk/demo/
-│   │   │   ├── SplashActivity.kt   # App's launch screen
-│   │   │   ├── MainActivity.kt     # Main logic and UI handling
-│   │   │   ├── KinetiZKHelper.kt   # Wrapper class for the KinetiZK Go SDK
-│   │   │   └── SensorCollector.kt  # Sensor data collection and management
-│   │   ├── res/                    # Resources (layouts, colors, strings, etc.)
-│   │   └── AndroidManifest.xml
-└── build.gradle
-```
+- **Sensors Used**: Linear accelerometer, gyroscope
+- **Sampling Rate**: SENSOR_DELAY_FASTEST (~1000Hz)
+- **Data Window**: 300ms total (-50ms before touch to +250ms after)
+- **Feature Vector**: 48 dimensions (2 sensors × 4 statistics × 2 segments × 3 axes)
+- **ML Model**: Support Vector Machine (SVM)
+- **Proof System**: Groth16 zk-SNARKs on BN254 curve
 
-### Core Class Descriptions
+## Requirements
 
--   `MainActivity.kt`: Controls the overall flow of the app, including UI event handling, touch detection, and Bot Mode simulation.
--   `KinetiZKHelper.kt`: A singleton helper class that encapsulates interaction with the Go SDK. It is responsible for SDK initialization, passing sensor data, and requesting proof generation and verification.
--   `SensorCollector.kt`: Uses the Android Sensor Manager to collect accelerometer and gyroscope data, filtering it based on touch events.
+- **Android 6.0+** (API level 23+)
+- **Physical Device** with accelerometer and gyroscope sensors
+- **Touch Capability** - the app needs actual finger touches to work properly
 
-## Getting Started
+*Note: This demo will not work properly on emulators as they lack real sensor data.*
 
-### Prerequisites
+## Running the Demo
 
--   Android Studio (latest version recommended)
--   Android SDK (API 33 or higher)
--   `kinetizk.aar` file (KinetiZK Go SDK)
--   `kinetizk_keys.json` file (ZKP Proving/Verifying Keys)
+1. Install the APK on a physical Android device
+2. Grant any requested permissions
+3. Tap the screen to see verification in action
+4. Try toggling "Bot Mode" to see the difference
+5. Observe the real-time classification results
 
-### Build and Run
+## Performance
 
-This project depends on the private KinetiZK Go SDK. To build it, you will need the pre-built SDK library and key files.
+- **Proof Generation**: ~300 milliseconds on modern devices
+- **Classification**: Nearly instantaneous
+- **Memory Usage**: ~20MB during operation
+- **Battery Impact**: Minimal (sensors used only during verification)
 
-1.  **Add the AAR Library**:
-    -   Place the provided `kinetizk.aar` file into the `app/libs/` directory of this Android project.
-
-2.  **Add the Proving/Verifying Key File**:
-    -   Place the provided `kinetizk_keys.json` file into the `app/src/main/assets/` directory of this Android project.
-
-3.  **Build and Run the Project**:
-    -   Open the project in Android Studio.
-    -   Run `Sync Project with Gradle Files` to sync dependencies.
-    -   Run the app on a connected Android device or emulator.
-
-## How to Use
-
-1.  Launch the app. After the splash screen, you will be taken to the main screen.
-2.  Briefly tap (touch and release) the gray area on the screen.
-3.  Sensor data is collected during the tap. The moment you lift your finger, ZKP proof generation and verification will begin.
-4.  After a moment, the classification result ("HUMAN" or "BOT"), along with the score and processing time, will be displayed at the bottom of the screen.
-
-### Testing with Bot Mode
-
--   Turn on the "Bot Mode" switch at the top of the screen. The app will start tapping the screen automatically.
--   Unlike a real touch, Bot Mode generates almost no change in sensor data, so it will almost always be classified as "BOT".
--   This allows you to see how KinetiZK distinguishes between physical and programmatic touches.
+---
 
 ## References
 
